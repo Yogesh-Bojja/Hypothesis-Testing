@@ -1,0 +1,223 @@
+---
+title : "Assignment 4 : Applied Analytics"
+author : "Yogesh Haresh Bojja (s3789918)"
+output:
+  html_notebook: default
+  pdf_document: default
+---
+<br>
+<h3><b>Question 1:</h3></b><br>
+<h4><b>INTRODUCTION</h4></b>
+We have been provided with the data from Australian institute of health and welfare which calculates Average length of stay(ALOS). This data includes different ‘Reporting unit’ and its corresponding ‘Reporting unit type’ located across different states in Australia. Each reporting unit is categorised into a different ‘Peer group’. This data shows the ‘Number of overnight stays’ and ‘Total overnight patients bed’ in the ‘Time period’ of 1 year in each ‘Category’ of the reporting unit. Average length of stay(ALOS) is calculated as the ‘Total overnight patients bed’ divided by the ‘Number of overnight stays’.
+
+<br><h4><b>PROBLEM STATEMENT</h4></b>
+It is been claimed that patients in South western sydney have an Average Length of stay(ALOS) of 4.5 days. We are going to test this hypothesis. After loading the data we will handle the missing values then we will remove the outliers present. We are going to check the normality by Q-Q plot. After doing the hypothesis tests by different approaches we will infer whether the claim is statistically significant or not. We are going to achieve this at 0.05 significance level.  
+
+<br><h4><b>DATA</h4></b>
+<h5><b>1) Loading and subsetting data</h5></b>
+Data is taken from Australian institute of health and welfare. Data is loaded with read_excel() function from readxl package. We are storing the data in df variable. We subset the dataframe by considering only observations of South Western Sydney for ALOS.
+```{r}
+library(readxl)
+df <- read_excel("average-length-of-stay-multilevel-data.xlsx", skip = 12)
+df <- subset(df, df$`Local Hospital Network (LHN)`== "South Western Sydney")
+df <- df[,"Average length of stay (days)"]
+```
+<br><h5><b>2) Handling missing value</h5></b>
+We can see below that 'NP' and '-' are unacceptable values hence we need to remove them. We eliminate observations with NP value by subsetting it. For further analysis we want to convert our dataframe to numeric hence we cast the dataframe to numeric by as.numeric(). After casting '-' values become NA so we eliminate those by subsetting the dataframe with the help of is.na(). After handling them completely we check the count of NA values in our dataframe which is displayed to 0.
+
+```{r}
+levels(factor(df$`Average length of stay (days)`))
+df <- df[df$`Average length of stay (days)`!="NP",]
+df$`Average length of stay (days)` <- as.numeric(df$`Average length of stay (days)`)
+df <- df[!is.na(df$`Average length of stay (days)`),]
+cat("\nAfter handling : ")
+sum(is.na(df$`Average length of stay (days)`))
+```
+<br><h5><b>3) Removing Outliers</h5></b>
+We can visualize the summary of data by boxplot. After plotting we see that there are outliers present in our dataset which might influence the hypothesis testing to give wrong results. Hence we need to eliminate them. The efficient method to eliminate them is by removing the values which fall beyond (Q3+IQR X 1.5) and (Q1-IQR X 1.5). From the first boxplot it could be inferred that outliers are present after ALOS = 8, hence we need to remove the values falling beyond the upper limit. Therefore we check whether values fall beyond (IQR X 1.5+Q3), if yes then we remove them.
+```{r}
+boxplot(df$`Average length of stay (days)`, main = "Before removing outliers", ylab = "ALOS (days)")
+iqr = IQR(df$`Average length of stay (days)`)
+q3 <- quantile(df$`Average length of stay (days)`, prob=0.75, na.rm = TRUE)
+limit_max <- q3 + 1.5*iqr
+df <- df[df$`Average length of stay (days)`<=limit_max,]
+boxplot(df$`Average length of stay (days)`, main = "After removing outliers", ylab = "ALOS (days)")
+
+```
+<h4><b>DESCRIPTIVE STATISTICS AND VISUALIZATION</h4></b>
+<h5><b>1) Analyzing normality by Q-Q Plot</h4></b>
+When data is less than 30 we need to check the normality of dataset. Hence we plot Q-Q plot. If all points falls on the diagonal then the data is said to be normal. If the curve is S shaped then the data is not normally distributed. From the plot below we can say that data is not normally distributed. But Central Limit theorem tells us that if the dataset is large i.e n>30 then we can assume the data is normally distributed irrespective of the the underlying populations distribution. Hence we can assume our data tends to act normally distributed. Therefore we can perform T-test.
+```{r}
+library(car)
+qqPlot(df$`Average length of stay (days)`, dist = "norm")
+```
+<h5><b>2) Descriptive Statistics</h5></b>
+Descriptive statistics is about the attributes which describes our data for example how our data is spread, what is its average etc. Mean is calculated by mean(). Standard deviation is calculated by sd(). length() gives the how many values does our dataset contain. Descriptive statistics can also be found by summary().
+```{r}
+mean <- mean(df$`Average length of stay (days)`)
+sd <- sd(df$`Average length of stay (days)`)
+n <- length(df$`Average length of stay (days)`)
+summary(df$`Average length of stay (days)`)
+cat("Mean : ",mean)
+cat("Standard deviation : ",sd)
+```
+<br><h4><b>HYPOTHESIS TESTING</h4></b>
+As it is claimed that ALOS of patients from South Western Sydney is 4.5, our null and alternative hypothesis will be as following.
+<br><b>H<sub>0</sub> : μ = 4.5
+<br>H<sub>A</sub> : μ ≠ 4.5</b>
+<br>Hence we will be testing the above hypothesis with one-sampled two tailed t-test. Level significance is 0.05.
+
+<h5><b>1) Testing by critical value :</h5></b>
+Here we are going to test the hypothesis by critical value approach.
+```{r}
+t_stat <- (mean-4.5)/(sd/sqrt(n))
+t_crit_lower <- qt(0.05/2, n-1, lower.tail = TRUE)
+t_crit_upper <- qt(0.05/2, n-1, lower.tail = FALSE)
+cat("T-statistics : ",t_stat)
+cat("lower critical value : ",t_crit_lower)
+cat("upper critical value : ",t_crit_upper)
+```
+We can see that t-statistics does not fall in the range of lower critical value and upper critical value. T-statistics falls in the rejection region. Therefore we can conclude that we fail to accept null hypothesis by CI approach.
+
+<h5><b>2) Testing by p-value</h5></b>
+Here we are going to test the hypothesis by p-value approach.
+<br><b> if p < α, Reject H<sub>0</sub>
+<br> if p > α, Fail to reject H<sub>0</sub></b>
+```{r}
+p_of_tstatistics <- 2*pt(q=t_stat, n-1, lower.tail = TRUE)
+cat("P-value : ",p_of_tstatistics)
+```
+P-value is 0.04919 which is less than the area of significance i.e. 0.05, hence we fail to accept the null hypothesis by p-value approach.
+
+<h5><b>3) Testing by CI</h5></b>
+Here er are going to test the hypothesis by CI approach.
+<br><b>If the 95% CI does not capture H<sub>0</sub>, reject H<sub>0</sub>
+<br>If the 95% CI capture H<sub>0</sub>, Fail to reject H<sub>0</sub></b>
+```{r}
+CIupper <- mean + abs(t_crit_upper)*(sd/sqrt(n))
+CIlower <- mean - abs(t_crit_upper)*(sd/sqrt(n))
+cat("CI lower bound : ",CIlower)
+cat("\nCI upper bound : ",CIupper)
+t.test(df$`Average length of stay (days)`, conf.level = 0.95, mu = 4.5, alternative = "two.sided")
+```
+CI range [4.077, 4.499] does not include the mean of null hyothesis which is 4.5, hence we fail to accept null hypothesis by CI approach too.
+<br><br>
+<h4><b>DISCUSSION</h4></b>
+A two-tailed, one-sample t-test was used to determine if the ALOS of patients from South Western Sydney was significantly different from the previously ALOS of 4.5. The 0.05 level of significance was used. The sample’s mean ALOS was M = 4.2885, SD = 2.003. The results of the one-sample t-test found the mean ALOS to be statistically significantly lower than the previous claim, t(349) = -1.9738, p = 0.04919, 95% CI [4.0778,4.4992].
+
+<br><h3><b>Question 2:</h3></b>
+<br><h4><b>INTRODUCTION</h4></b>
+We are provided with the data that has scores of the students before attending tutorial and after attending tutorial.
+
+<h4><b>PROBLEM STATEMENT</h4></b>
+Studies show that tutorials improve the understanding of students which leads to increase in their scores. Hence we need to prove this claim.
+<h4><b>DATA</h4></b>
+<h5><b>1) Loading and subsetting data</h5></b>
+We load the data by read.csv function. As we need only two columns from the dataset, we subset it.
+```{r}
+df <- read.csv("Assignment4b.csv")
+df <- df[,c(6,7)]
+```
+
+<h5><b>2) Handling missing value</h4></b>
+If there are any missing values we remove the observation or replace them with some statistics. In the following code we see that there are no NA values in the dataset, Hence no need to remove anything.
+```{r}
+cat(sum(is.na(df$Score.before.tutorial)))
+cat(sum(is.na(df$Score.after.tutorial)))
+```
+<h4><b>DESCRIPTIVE STATISTICS AND VISUALIZATION</h4></b>
+<h5><b>1) Descriptive statistics</h5></b>
+Descriptive statistics is all about describing the dataset for example its average, how the data is spread etc. We need to find the difference between both the columns for further testing. Hence we perform the subttaction and store it in new column.
+```{r}
+df$difference <- df$Score.after.tutorial - df$Score.before.tutorial
+head(df, 2)
+```
+descriptive statistics for the difference column is : 
+```{r}
+diff_mean <- mean(df$difference)
+diff_sd <- sd(df$difference)
+n = length(df$difference)
+summary(df$difference)
+```
+<h5><b>2) Visualization</h5></b>
+<b>a) Box plot:</b><br>
+Box plot summarizes the data visually. From the boxplot we can see that mean of the scores has increased after students attend tutorial.
+```{r}
+boxplot(
+  df$Score.before.tutorial,
+  df$Score.after.tutorial,
+  ylab = "Score",
+  xlab = "Tutorial"
+)
+axis(1, at = 1:2, labels = c("Before", "After"))
+```
+<b>b) Q-Q plot :</b><br>
+Q-Q plot shows that most of the data points lie on the diagonal.  Sample size is 1290 which is greater than 30 hence we can assume it as normally distributed.  
+```{r}
+library(car)
+qqPlot(df$difference, distribution = "norm")
+```
+<h4><b>HYPOTHESIS TESTING</h4></b>
+Studies show that tutorial is important to improve the scores which means after attending tutorial, score of the students increase. Hence the difference between the score after attending tutorial and before attending tutorial is greater than or equal to zero which becomes our null hypothesis.
+<br><b>H<sub>0</sub> : μ<sub>a</sub> - μ<sub>b</sub> >= 0 
+<br>H<sub>A</sub> : μ<sub>a</sub> - μ<sub>b</sub> < 0 </b>
+<br>We are going to test the above hypothesis by paired sample t-test which will be lower tailed. Area of significance is 0.05.
+
+<br><h5><b>1) Testing by critical value</h5></b>
+Testing the Hypothesis by critical value.
+```{r}
+t_statistics <- (diff_mean - 0)/(diff_sd/sqrt(n))
+t_critical <- qt(0.05, n-1, lower.tail = TRUE)
+cat("T-statistics : ",t_statistics)
+cat("T-critical : ",t_critical)
+```
+We can see that t-statistics fall beyond the t-critcal. It does not fall in rejection region. Hence by this approach we fail to reject null hypothesis. 
+
+<br><h5><b>2) Testing by CI</h5></b>
+Here we will be testing the hypothesis by CI approach.
+<br><b>If the 95% CI does not capture mean of difference, reject H<sub>0</sub>
+<br>If the 95% CI capture mean of difference, Fail to reject H<sub>0</sub></b>
+```{r}
+CIupper <- diff_mean + abs(tcrit)*(diff_sd/sqrt(n))
+CIlower <- diff_mean - abs(tcrit)*(diff_sd/sqrt(n))
+cat("CI lower : ",CIlower)
+cat("\nCI upper : ",CIupper)
+```
+Range of CI [4.89, 5.81] captures the original mean i.e. 5.35. Hence we fail to reject null hypothesis by this approach. We cannot find any statistical significance.
+
+<br><h5><b>3) Testing by p-value</h5></b>
+Testing hypothesis by p-value is as follows.
+<br><b> if p < α, Reject H<sub>0</sub>
+<br> if p > α, Fail to reject H<sub>0</sub></b>
+```{r}
+p_value <- pt(q=t_statistics, n-1, lower.tail = TRUE)
+cat("P value : ",p_value)
+```
+As p-value is 1 we fail to reject the null hypothesis.
+
+<br><h4><b>DISCUSSION</h4></b>
+A paired-samples t-test was used to test for a significant reduced mean difference between scores before and after attending tutorial. The mean difference was found to be 5.3503 (SD = 10.0379). Visual inspection of the Q-Q plot of the difference scores suggested that the data were approximately normally distributed. The paired-samples t-test did not find a statistically significant mean difference in reducing the scores before and after attending tutorial, t(df=1289)=19.1441, p=1, 95% [4.903, 5.8104]. Scores were found to be significantly increased after attending tutorial.
+
+<br><h4><b>REFERENCES</h4></b>
+<ul>
+  <li>Applied Analytics Module 7 notes</li>
+  <li>(R Documentation and manuals | R Documentation, 2020)</li>
+  <li>(t.test function | R Documentation, 2020)</li>
+  <li>(Admitted patients - Australian Institute of Health and Welfare, 2020)</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
